@@ -67,7 +67,7 @@ struct Substitution : public FunctionPass {
     funcXor[1] = &Substitution::xorSubstitutionRand;
   }
 
-  bool runOnFunction(Function &F);
+  bool runOnFunction(Function &F) override;
   bool substitute(Function *f);
 
   void addNeg(BinaryOperator *bo);
@@ -225,10 +225,15 @@ void Substitution::addDoubleNeg(BinaryOperator *bo) {
     // op->setHasNoUnsignedWrap(bo->hasNoUnsignedWrap());
   }
   else {
-    op = BinaryOperator::CreateFNeg(bo->getOperand(0), "", bo);
-    op2 = BinaryOperator::CreateFNeg(bo->getOperand(1), "", bo);
-    op = BinaryOperator::Create(Instruction::FAdd, op, op2, "", bo);
-    op = BinaryOperator::CreateFNeg(op, "", bo);
+    // HDS
+    // op = BinaryOperator::CreateFNeg(bo->getOperand(0), "", bo);
+    // op2 = BinaryOperator::CreateFNeg(bo->getOperand(1), "", bo);
+    // op = BinaryOperator::Create(Instruction::FAdd, op, op2, "", bo);
+    // op = BinaryOperator::CreateFNeg(op, "", bo);
+    op = BinaryOperator::CreateNeg(bo->getOperand(0), "", bo);
+    op2 = BinaryOperator::CreateNeg(bo->getOperand(1), "", bo);
+    op = BinaryOperator::Create(Instruction::Add, op, op2, "", bo);
+    op = BinaryOperator::CreateNeg(op, "", bo);
   }
     bo->replaceAllUsesWith(op);
 
@@ -308,7 +313,11 @@ void Substitution::subNeg(BinaryOperator *bo) {
     // op->setHasNoUnsignedWrap(bo->hasNoUnsignedWrap());
   }
   else {
-    op = BinaryOperator::CreateFNeg(bo->getOperand(1), "", bo);
+    // HDS
+    // op = BinaryOperator::CreateFNeg(bo->getOperand(1), "", bo);
+    // op = BinaryOperator::Create(Instruction::FAdd, bo->getOperand(0), op, "",
+    //                             bo);
+    op = BinaryOperator::CreateNeg(bo->getOperand(1), "", bo);
     op = BinaryOperator::Create(Instruction::FAdd, bo->getOperand(0), op, "",
                                 bo);
   }

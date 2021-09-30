@@ -22,7 +22,7 @@ struct SplitBasicBlock : public FunctionPass {
   SplitBasicBlock() : FunctionPass(ID) { this->flag = true; }
   SplitBasicBlock(bool flag) : FunctionPass(ID) { this->flag = flag; }
 
-  bool runOnFunction(Function &F);
+  bool runOnFunction(Function &F) override;
   void split(Function *f);
 
   bool containsPHI(BasicBlock *b);

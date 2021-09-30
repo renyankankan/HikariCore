@@ -1,6 +1,6 @@
 // For open-source license, please refer to [License](https://github.com/HikariObfuscator/Hikari/wiki/License).
 //===----------------------------------------------------------------------===//
-#include "llvm/IR/CallSite.h"
+// #include "llvm/IR/CallSite.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
@@ -17,13 +17,13 @@ using namespace llvm;
 using namespace std;
 static cl::opt<int>
     ProbRate("fw_prob",
-             cl::desc("Choose the probability [%] For Each CallSite To Be "
+             cl::desc("Choose the probability [%] For Each CallBase To Be "
                       "Obfuscated By FunctionWrapper"),
              cl::value_desc("Probability Rate"), cl::init(30), cl::Optional);
 static cl::opt<int> ObfTimes(
     "fw_times",
     cl::desc(
-        "Choose how many time the FunctionWrapper pass loop on a CallSite"),
+        "Choose how many time the FunctionWrapper pass loop on a CallBase"),
     cl::value_desc("Number of Times"), cl::init(2), cl::Optional);
 namespace llvm {
 struct FunctionWrapper : public ModulePass {
@@ -35,7 +35,7 @@ struct FunctionWrapper : public ModulePass {
     return StringRef("FunctionWrapper");
   }
   bool runOnModule(Module &M) override {
-    vector<CallSite *> callsites;
+    vector<CallBase *> callsites;
     for (Module::iterator iter = M.begin(); iter != M.end(); iter++) {
       Function &F = *iter;
       if (toObfuscate(flag, &F, "fw")) {
@@ -44,23 +44,23 @@ struct FunctionWrapper : public ModulePass {
           Instruction *Inst = &*fi;
           if (isa<CallInst>(Inst) || isa<InvokeInst>(Inst)) {
             if ((int)llvm::cryptoutils->get_range(100) <= ProbRate) {
-              callsites.push_back(new CallSite(Inst));
+              callsites.push_back(dyn_cast<CallBase>(Inst));
             }
           }
         }
       }
     }
-    for (CallSite *CS : callsites) {
+    for (CallBase *CS : callsites) {
       for (int i = 0; i < ObfTimes && CS != nullptr; i++) {
-        CS = HandleCallSite(CS);
+        CS = HandleCallBase(CS);
       }
     }
     return true;
   } // End of runOnModule
-  CallSite *HandleCallSite(CallSite *CS) {
+  CallBase *HandleCallBase(CallBase *CS) {
     Value *calledFunction = CS->getCalledFunction();
     if (calledFunction == nullptr) {
-      calledFunction = CS->getCalledValue()->stripPointerCasts();
+      calledFunction = CS->getCalledOperand()->stripPointerCasts();
     }
     // Filter out IndirectCalls that depends on the context
     // Otherwise It'll be blantantly troublesome since you can't reference an
@@ -70,7 +70,7 @@ struct FunctionWrapper : public ModulePass {
     if (calledFunction == nullptr ||
         (!isa<ConstantExpr>(calledFunction) &&
          !isa<Function>(calledFunction)) ||
-        CS->getIntrinsicID() != Intrinsic::ID::not_intrinsic) {
+        CS->getIntrinsicID() != Intrinsic::not_intrinsic) {
       return nullptr;
     }
     if (Function *tmp = dyn_cast<Function>(calledFunction)) {
@@ -109,7 +109,11 @@ struct FunctionWrapper : public ModulePass {
     for (auto arg = func->arg_begin(); arg != func->arg_end(); arg++) {
       params.push_back(arg);
     }
-    Value *retval = IRB.CreateCall(ConstantExpr::getBitCast(cast<Function>(calledFunction),CS->getCalledValue()->getType()), ArrayRef<Value *>(params));
+    // HDS:
+    // Value *retval = IRB.CreateCall(ConstantExpr::getBitCast(cast<Function>(calledFunction),CS->getCalledOperand()->getType()), ArrayRef<Value *>(params));
+    Function * tmpFunc = cast<Function>(calledFunction);
+    Value *retval = IRB.CreateCall(tmpFunc->getFunctionType(), tmpFunc, ArrayRef<Value *>(params));
+
     if (ft->getReturnType()->isVoidTy()) {
       IRB.CreateRetVoid();
     } else {
@@ -117,9 +121,7 @@ struct FunctionWrapper : public ModulePass {
     }
     CS->setCalledFunction(func);
     CS->mutateFunctionType(ft);
-    Instruction *Inst = CS->getInstruction();
-    delete CS;
-    return new CallSite(Inst);
+    return CS;
   }
 };
 ModulePass *createFunctionWrapperPass() { return new FunctionWrapper(); }

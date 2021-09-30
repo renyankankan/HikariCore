@@ -11,7 +11,7 @@ struct Flattening : public FunctionPass {
   bool flag;
   Flattening() : FunctionPass(ID) { this->flag = true; }
   Flattening(bool flag) : FunctionPass(ID) { this->flag = flag; }
-  bool runOnFunction(Function &F);
+  bool runOnFunction(Function &F) override;
   bool flatten(Function *f);
 };
 } // namespace
@@ -112,7 +112,8 @@ bool Flattening::flatten(Function *f) {
   loopEntry = BasicBlock::Create(f->getContext(), "loopEntry", f, insert);
   loopEnd = BasicBlock::Create(f->getContext(), "loopEnd", f, insert);
 
-  load = new LoadInst(switchVar, "switchVar", loopEntry);
+  Type * ty = cast<PointerType>(switchVar->getType())->getElementType();
+  load = new LoadInst(ty, switchVar, "switchVar", loopEntry);
 
   // Move first BB on top
   insert->moveBefore(loopEntry);
