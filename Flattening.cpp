@@ -46,9 +46,14 @@ bool Flattening::flatten(Function *f) {
   std::map<uint32_t,uint32_t> scrambling_key;
   // END OF SCRAMBLER
 
-  // Lower switch
-  FunctionPass *lower = createLowerSwitchPass();
-  lower->runOnFunction(*f);
+  #if LLVM_VERSION_MAJOR >= 9
+    // >=9.0, LowerSwitchPass depends on LazyValueInfoWrapperPass, which cause AssertError.
+    // So I move LowerSwitchPass into register function, just before FlatteningPass.
+  #else
+    // Lower switch
+    FunctionPass *lower = createLowerSwitchPass();
+    lower->runOnFunction(*f);
+  #endif
 
   // Save all original BB
   for (Function::iterator i = f->begin(); i != f->end(); ++i) {
@@ -112,8 +117,7 @@ bool Flattening::flatten(Function *f) {
   loopEntry = BasicBlock::Create(f->getContext(), "loopEntry", f, insert);
   loopEnd = BasicBlock::Create(f->getContext(), "loopEnd", f, insert);
 
-  Type * ty = cast<PointerType>(switchVar->getType())->getElementType();
-  load = new LoadInst(ty, switchVar, "switchVar", loopEntry);
+  load = new LoadInst(switchVar->getType()->getElementType(), switchVar, "switchVar", loopEntry);
 
   // Move first BB on top
   insert->moveBefore(loopEntry);
